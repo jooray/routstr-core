@@ -96,6 +96,14 @@ if typing.TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+def _decoded_response_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    """Let ASGI frame bodies that httpx decoded or Routstr annotated."""
+    excluded = {"content-length", "content-encoding", "transfer-encoding", "connection"}
+    return {
+        name: value for name, value in headers.items() if name.lower() not in excluded
+    }
+
+
 CostMetadata = CostData | MaxCostData | dict[str, Any]
 
 
@@ -799,6 +807,9 @@ class BaseUpstreamProvider:
             return True
         return "openrouter.ai" in (self.base_url or "")
 
+    def _apply_reasoning_effort(self, data: dict, model_obj: Model) -> bool:
+        return apply_reasoning_effort(data, model_obj)
+
     def prepare_request_body(
         self,
         body: bytes | None,
@@ -886,7 +897,7 @@ class BaseUpstreamProvider:
             if inject_anthropic_cache_breakpoints(data):
                 changed = True
 
-        if apply_reasoning_effort(data, model_obj):
+        if self._apply_reasoning_effort(data, model_obj):
             changed = True
 
         if changed:
@@ -1531,7 +1542,7 @@ class BaseUpstreamProvider:
                 await stream_finalizer.run()
 
         # Remove inaccurate encoding headers from upstream response
-        response_headers = dict(response.headers)
+        response_headers = _decoded_response_headers(response.headers)
         response_headers.pop("content-encoding", None)
         response_headers.pop("content-length", None)
 
@@ -1992,7 +2003,7 @@ class BaseUpstreamProvider:
                 await stream_finalizer.run()
 
         # Remove inaccurate encoding headers from upstream response
-        response_headers = dict(response.headers)
+        response_headers = _decoded_response_headers(response.headers)
         response_headers.pop("content-encoding", None)
         response_headers.pop("content-length", None)
 
@@ -2284,7 +2295,7 @@ class BaseUpstreamProvider:
             stream,
             finalizer=finalizer,
             status_code=response.status_code,
-            headers=dict(response.headers),
+            headers=_decoded_response_headers(response.headers),
         )
 
     async def handle_streaming_messages_completion(
@@ -2585,7 +2596,7 @@ class BaseUpstreamProvider:
             finally:
                 await stream_finalizer.run()
 
-        response_headers = dict(response.headers)
+        response_headers = _decoded_response_headers(response.headers)
         response_headers.pop("content-encoding", None)
         response_headers.pop("content-length", None)
 
@@ -3393,6 +3404,7 @@ class BaseUpstreamProvider:
                         code=rate_limit.code if rate_limit else None,
                         details=rate_limit.as_details() if rate_limit else None,
                         from_upstream_response=True,
+                        upstream_body=body_preview,
                     )
 
                 try:
@@ -3769,6 +3781,7 @@ class BaseUpstreamProvider:
                         code=rate_limit.code if rate_limit else None,
                         details=rate_limit.as_details() if rate_limit else None,
                         from_upstream_response=True,
+                        upstream_body=body_preview,
                     )
 
                 try:
@@ -3969,7 +3982,7 @@ class BaseUpstreamProvider:
                     request, path, response
                 )
 
-            response_headers = dict(response.headers)
+            response_headers = _decoded_response_headers(response.headers)
             response_headers.pop("content-encoding", None)
             response_headers.pop("content-length", None)
             return Response(
@@ -4193,7 +4206,7 @@ class BaseUpstreamProvider:
             },
         )
 
-        response_headers = dict(response.headers)
+        response_headers = _decoded_response_headers(response.headers)
         if "transfer-encoding" in response_headers:
             del response_headers["transfer-encoding"]
         if "content-encoding" in response_headers:
@@ -4439,7 +4452,7 @@ class BaseUpstreamProvider:
                     media_type="application/json",
                 )
 
-            response_headers = dict(response.headers)
+            response_headers = _decoded_response_headers(response.headers)
             if "transfer-encoding" in response_headers:
                 del response_headers["transfer-encoding"]
             if "content-encoding" in response_headers:
@@ -4527,7 +4540,7 @@ class BaseUpstreamProvider:
             return Response(
                 content=content_str,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=_decoded_response_headers(response.headers),
                 media_type="application/json",
             )
 
@@ -4615,7 +4628,7 @@ class BaseUpstreamProvider:
             return ClosingStreamingResponse(
                 response.aiter_bytes(),
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=_decoded_response_headers(response.headers),
             )
 
     async def forward_x_cashu_request(
@@ -4817,7 +4830,7 @@ class BaseUpstreamProvider:
             return ClosingStreamingResponse(
                 OwnedUpstreamStream(response.aiter_bytes(), response, client),
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=_decoded_response_headers(response.headers),
             )
         except asyncio.CancelledError:
             await close_upstream_exchange(response, client)
@@ -5122,7 +5135,7 @@ class BaseUpstreamProvider:
             return ClosingStreamingResponse(
                 OwnedUpstreamStream(response.aiter_bytes(), response, client),
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=_decoded_response_headers(response.headers),
             )
         except asyncio.CancelledError:
             await close_upstream_exchange(response, client)
@@ -5234,7 +5247,7 @@ class BaseUpstreamProvider:
             return ClosingStreamingResponse(
                 response.aiter_bytes(),
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=_decoded_response_headers(response.headers),
             )
 
     async def handle_x_cashu_streaming_responses_response(
@@ -5264,7 +5277,7 @@ class BaseUpstreamProvider:
             },
         )
 
-        response_headers = dict(response.headers)
+        response_headers = _decoded_response_headers(response.headers)
         if "transfer-encoding" in response_headers:
             del response_headers["transfer-encoding"]
         if "content-encoding" in response_headers:
@@ -5496,7 +5509,7 @@ class BaseUpstreamProvider:
                     media_type="application/json",
                 )
 
-            response_headers = dict(response.headers)
+            response_headers = _decoded_response_headers(response.headers)
             if "transfer-encoding" in response_headers:
                 del response_headers["transfer-encoding"]
             if "content-encoding" in response_headers:
@@ -5584,7 +5597,7 @@ class BaseUpstreamProvider:
             return Response(
                 content=content_str,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=_decoded_response_headers(response.headers),
                 media_type="application/json",
             )
 
@@ -5876,6 +5889,10 @@ class BaseUpstreamProvider:
                 )
                 if not provider or not provider.id:
                     raise HTTPException(status_code=404, detail="Provider not found")
+                if not provider.enabled:
+                    self._models_cache = []
+                    self._models_by_id = {}
+                    return
 
                 db_models = await list_models(
                     session=session,
