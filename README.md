@@ -1,5 +1,7 @@
 # Routstr Payment Proxy
 
+> **Unmaintained.** This branch is a sample of an older approach to confidential mode (protocol v1: the client ran the TLS handshake alone). It is kept for reference only and will no longer be maintained. The current protocol (v2, a two-party TLS key schedule) is on the `confidential-2pc` branch; see https://github.com/jooray/routstr-confidential.
+
 [![License](https://img.shields.io/github/license/routstr/routstr-core?style=flat-square)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/routstr/routstr-core?style=flat-square)](https://github.com/routstr/routstr-core/stargazers)
 [![Issues](https://img.shields.io/github/issues/routstr/routstr-core?style=flat-square)](https://github.com/routstr/routstr-core/issues)
